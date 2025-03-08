@@ -6,3 +6,8 @@ crosstool-ng
 aesd-build
 .vscode/
 test.sh.log
+
+finder-app/finder
+finder-app/finder.o
+finder-app/writer
+finder-app/writer.o

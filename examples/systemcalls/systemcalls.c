@@ -1,3 +1,7 @@
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <fcntl.h>
 #include "systemcalls.h"
 
 /**
@@ -7,17 +11,14 @@
  *   either in invocation of the system() call, or if a non-zero return
  *   value was returned by the command issued in @param cmd.
 */
-bool do_system(const char *cmd)
-{
+bool do_system(const char *cmd) {
 
 /*
- * TODO  add your code here
  *  Call the system() function with the command set in the cmd
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
-
-    return true;
+    return system(cmd) == 0;
 }
 
 /**
@@ -34,14 +35,12 @@ bool do_system(const char *cmd)
 *   by the command issued in @param arguments with the specified arguments.
 */
 
-bool do_exec(int count, ...)
-{
+bool do_exec(int count, ...) {
     va_list args;
     va_start(args, count);
-    char * command[count+1];
+    char *command[count + 1];
     int i;
-    for(i=0; i<count; i++)
-    {
+    for (i = 0; i < count; i++) {
         command[i] = va_arg(args, char *);
     }
     command[count] = NULL;
@@ -50,7 +49,6 @@ bool do_exec(int count, ...)
     command[count] = command[count];
 
 /*
- * TODO:
  *   Execute a system command by calling fork, execv(),
  *   and wait instead of system (see LSP page 161).
  *   Use the command[0] as the full path to the command to execute
@@ -58,10 +56,25 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
-
     va_end(args);
 
-    return true;
+    pid_t pid = fork();
+
+    if (pid < 0) {
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid == 0) {
+        if (execv(command[0], command) < 0) {
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    int status;
+    waitpid(pid, &status, 0);
+    return WEXITSTATUS(status) == EXIT_SUCCESS;
+
+
 }
 
 /**
@@ -69,14 +82,12 @@ bool do_exec(int count, ...)
 *   This file will be closed at completion of the function call.
 * All other parameters, see do_exec above
 */
-bool do_exec_redirect(const char *outputfile, int count, ...)
-{
+bool do_exec_redirect(const char *outputfile, int count, ...) {
     va_list args;
     va_start(args, count);
-    char * command[count+1];
+    char *command[count + 1];
     int i;
-    for(i=0; i<count; i++)
-    {
+    for (i = 0; i < count; i++) {
         command[i] = va_arg(args, char *);
     }
     command[count] = NULL;
@@ -86,14 +97,38 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
 
 
 /*
- * TODO
  *   Call execv, but first using https://stackoverflow.com/a/13784315/1446624 as a refernce,
  *   redirect standard out to a file specified by outputfile.
  *   The rest of the behaviour is same as do_exec()
  *
 */
+    int fd = open(outputfile, O_WRONLY | O_TRUNC | O_CREAT, 0644);
+
+    if (fd < 0) {
+        return false;
+    }
+    pid_t pid = fork();
+
+    printf("PID %d\n", pid);
+
+    if (pid < 0) {
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid == 0) {
+        if (dup2(fd, 1) < 0) {
+            exit(EXIT_FAILURE);
+        }
+        close(fd);
+        if (execv(command[0], command) < 0) {
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    int status;
+    waitpid(pid, &status, 0);
 
     va_end(args);
 
-    return true;
+    return WEXITSTATUS(status) == EXIT_SUCCESS;
 }

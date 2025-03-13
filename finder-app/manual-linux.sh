@@ -4,6 +4,7 @@
 
 set -e
 set -u
+set -x
 
 OUTDIR=/tmp/aeld
 KERNEL_REPO=git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git
@@ -90,6 +91,7 @@ fi
 
 # Make and install busybox
 echo "Building busybox"
+pwd
 make distclean
 make defconfig
 make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE}
@@ -139,7 +141,7 @@ cp -a "$FINDER_APP_DIR"/finder-test.sh "$ROOTFS_DIR"/home/.
 cp -a "$FINDER_APP_DIR"/autorun-qemu.sh "$ROOTFS_DIR"/home/.
 
 # Chown the root directory
-sudo chown root "$OUTDIR/rootfs"
+sudo chown -R root "$OUTDIR/rootfs"
 
 # Create initramfs file
 cd "$ROOTFS_DIR"

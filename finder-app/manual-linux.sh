@@ -34,20 +34,48 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
     echo "Checking out version ${KERNEL_VERSION}"
     git checkout ${KERNEL_VERSION}
 
-    # TODO: Add your kernel build steps here
+    # Kernel build steps
+    # clean
+    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} mrproper
+    # defconfig
+    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} defconfig
+    # all
+    make -j4 ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} all
+    # device tree
+    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} dtbs
+    # copy image to outdir
+    cp -a arch/arm64/boot/Image "$OUTDIR"/.
+
 fi
 
 echo "Adding the Image in outdir"
 
 echo "Creating the staging directory for the root filesystem"
-cd "$OUTDIR"
-if [ -d "${OUTDIR}/rootfs" ]
+ROOTFS_DIR="$OUTDIR"/rootfs
+
+if [ -d "$ROOTFS_DIR" ]
 then
-	echo "Deleting rootfs directory at ${OUTDIR}/rootfs and starting over"
-    sudo rm  -rf ${OUTDIR}/rootfs
+	echo "Deleting rootfs directory at ${ROOTFS_DIR} and starting over"
+    sudo rm  -rf "$ROOTFS_DIR"
 fi
 
-# TODO: Create necessary base directories
+# Create necessary base directories
+mkdir -p "$ROOTFS_DIR"/bin
+mkdir -p "$ROOTFS_DIR"/dev
+mkdir -p "$ROOTFS_DIR"/etc
+mkdir -p "$ROOTFS_DIR"/home/conf
+mkdir -p "$ROOTFS_DIR"/lib
+mkdir -p "$ROOTFS_DIR"/lib64
+mkdir -p "$ROOTFS_DIR"/proc
+mkdir -p "$ROOTFS_DIR"/sbin
+mkdir -p "$ROOTFS_DIR"/sys
+mkdir -p "$ROOTFS_DIR"/tmp
+mkdir -p "$ROOTFS_DIR"/usr
+mkdir -p "$ROOTFS_DIR"/var
+mkdir -p "$ROOTFS_DIR"/usr/bin
+mkdir -p "$ROOTFS_DIR"/usr/lib
+mkdir -p "$ROOTFS_DIR"/usr/sbin
+mkdir -p "$ROOTFS_DIR"/var/log
 
 cd "$OUTDIR"
 if [ ! -d "${OUTDIR}/busybox" ]
@@ -60,21 +88,61 @@ else
     cd busybox
 fi
 
-# TODO: Make and install busybox
+# Make and install busybox
+echo "Building busybox"
+make distclean
+make defconfig
+make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE}
+make CONFIG_PREFIX="${ROOTFS_DIR}" ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} install
 
 echo "Library dependencies"
-${CROSS_COMPILE}readelf -a bin/busybox | grep "program interpreter"
-${CROSS_COMPILE}readelf -a bin/busybox | grep "Shared library"
+echo Program Interpreter
+${CROSS_COMPILE}readelf -a "$OUTDIR"/bin/busybox | grep "program interpreter"
+echo Shared Library
+${CROSS_COMPILE}readelf -a "$OUTDIR"/bin/busybox | grep "Shared library"
 
-# TODO: Add library dependencies to rootfs
+# Add library dependencies to rootfs
+# These are included in repo
+cp "$FINDER_APP_DIR"/deps/ld-linux-aarch64.so.1 "$ROOTFS_DIR"/lib/.
+cp "$FINDER_APP_DIR"/deps/libc.so.6 "$ROOTFS_DIR"/lib64/.
+cp "$FINDER_APP_DIR"/deps/libm.so.6 "$ROOTFS_DIR"/lib64/.
+cp "$FINDER_APP_DIR"/deps/libresolv.so.2 "$ROOTFS_DIR"/lib64/.
 
-# TODO: Make device nodes
+# Make device nodes
+sudo mknod -m 666 "$ROOTFS_DIR"/dev/null c 1 3
+sudo mknod -m 666 "$ROOTFS_DIR"/dev/tty0  c 1 5
 
-# TODO: Clean and build the writer utility
+# Clean and build the writer utility
+cd "$FINDER_APP_DIR"
+make clean
+CROSS_COMPILE=${CROSS_COMPILE} make all
+cd "$OUTDIR"
 
-# TODO: Copy the finder related scripts and executables to the /home directory
+# Copy the finder related scripts and executables to the /home directory
 # on the target rootfs
 
-# TODO: Chown the root directory
+# copy writer and finder binaries
+cp -a "$FINDER_APP_DIR"/writer "$ROOTFS_DIR"/home/.
+cp -a "$FINDER_APP_DIR"/finder "$ROOTFS_DIR"/home/.
 
-# TODO: Create initramfs.cpio.gz
+# copy finder.sh
+cp -a "$FINDER_APP_DIR"/finder.sh "$ROOTFS_DIR"/home/.
+
+# copy username.txt and assignment.txt
+cp -a "$FINDER_APP_DIR"/conf/username.txt "$ROOTFS_DIR"/home/conf/.
+cp -a "$FINDER_APP_DIR"/conf/assignment.txt "$ROOTFS_DIR"/home/conf/.
+
+# copy finder-test.sh
+cp -a "$FINDER_APP_DIR"/finder-test.sh "$ROOTFS_DIR"/home/.
+
+# copy autorun-qemu.sh
+cp -a "$FINDER_APP_DIR"/autorun-qemu.sh "$ROOTFS_DIR"/home/.
+
+# Chown the root directory
+sudo chown root "$OUTDIR/rootfs"
+
+# Create initramfs file
+cd "$ROOTFS_DIR"
+find . | cpio -H newc -ov --owner root:root > $OUTDIR/initramfs.cpio
+cd "$OUTDIR"
+gzip -f initramfs.cpio

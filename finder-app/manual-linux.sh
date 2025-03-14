@@ -45,11 +45,11 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
     # device tree
     make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} dtbs
     # copy image to outdir
-    cp -a arch/arm64/boot/Image "$OUTDIR"/.
 
 fi
 
 echo "Adding the Image in outdir"
+cp  ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image "$OUTDIR"/.
 
 echo "Creating the staging directory for the root filesystem"
 ROOTFS_DIR="$OUTDIR"/rootfs
@@ -99,9 +99,9 @@ make CONFIG_PREFIX="${ROOTFS_DIR}" ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} i
 
 echo "Library dependencies"
 echo Program Interpreter
-${CROSS_COMPILE}readelf -a "$OUTDIR"/bin/busybox | grep "program interpreter"
+${CROSS_COMPILE}readelf -a "$ROOTFS_DIR"/bin/busybox | grep "program interpreter"
 echo Shared Library
-${CROSS_COMPILE}readelf -a "$OUTDIR"/bin/busybox | grep "Shared library"
+${CROSS_COMPILE}readelf -a "$ROOTFS_DIR"/bin/busybox | grep "Shared library"
 
 # Add library dependencies to rootfs
 # These are included in repo
